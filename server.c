@@ -6,20 +6,20 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 1025
+#define HEADER_SIZE 7
+
+unsigned short check_checksum(char *buffer, int length, unsigned short checksum);
 
 void recv_file(int serv_sock);
-
 int main (int argc, char *argv[])
 {
 	int serv_sock;
 	int clnt_sock;
 
-
 	struct sockaddr_in serv_addr;
 	struct sockaddr_in clnt_addr;
 	socklen_t clnt_addr_size;
-
 
 	if (argc!=2)
 	{
@@ -46,10 +46,13 @@ int main (int argc, char *argv[])
 
 void recv_file(int serv_sock)
 {
-	char recvBuffer[BUFFER_SIZE];
+	char recvBuffer[BUFFER_SIZE + HEADER_SIZE];
+	char dataBuffer[BUFFER_SIZE];
 	char filename[BUFFER_SIZE];
 	char ack[] = "ACK\0";
 	int filesize;
+	int seq_num;
+	unsigned short checksum;
 	memset (filename, 0, sizeof(filename));
 	memset (recvBuffer, 0, sizeof(recvBuffer));
 
@@ -57,30 +60,56 @@ void recv_file(int serv_sock)
 	socklen_t clnt_addr_size = sizeof(clnt_addr);
 	
 	// filename get
-	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, 
+			(struct sockaddr *)&clnt_addr, &clnt_addr_size);
 	printf("Receiving filename : %s\n", filename);
 
 	// filesize get
-	recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, 
+			(struct sockaddr *)&clnt_addr, &clnt_addr_size);
 	sscanf(recvBuffer, "%d", &filesize);	
 	printf("Receiving filesize : %d\n", filesize);
 
 	int fd = open(filename, O_WRONLY | O_CREAT, 0755);
 	int read_byte, total_byte=0;
 	memset (recvBuffer, 0, sizeof(recvBuffer));
+	memset (dataBuffer, 0, sizeof(dataBuffer));
+
 	while(1) {
-		read_byte = recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+		read_byte = recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, 
+				(struct sockaddr *)&clnt_addr, &clnt_addr_size);
+		read_byte -= HEADER_SIZE; // EXCEPT header size of seqnum, checksum
+		sscanf(recvBuffer, "%d %hx %s", &seq_num, &checksum, dataBuffer);
+		unsigned short ischeck = check_checksum(dataBuffer, read_byte, checksum);
+		printf("is checksum right? %hd\t", ischeck);
+//		printf("checksum is %hx\t", checksum);
 	//	read_byte = strlen(recvBuffer);
-		write(fd, recvBuffer, read_byte);
+		write(fd, dataBuffer, read_byte);
 		sendto(serv_sock, ack, strlen(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	//	printf("Received Part : %s\n", recvBuffer);
 		total_byte += read_byte;
 		memset (recvBuffer, 0, sizeof(recvBuffer));
-		printf("totalbyte = %d\tfilesize = %d\r", total_byte, filesize);
-//		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
+		memset (dataBuffer, 0, sizeof(dataBuffer));
+		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
 		if (total_byte == filesize)
 			break;
 	} 
+	printf("\nProgram End.\n");
 	close(fd);
+}
+
+unsigned short check_checksum(char *buffer, int length, unsigned short checksum)
+{
+	int i=0;
+	unsigned int c;
+	for ( ; length > 0; length -= 2)
+	{
+		c += (unsigned int)buffer[i] << 8;
+		if (length != 1) 
+			c += (unsigned int)buffer[i+1];
+		c = (c&0xFFFF) +  (c>>16); // carry bit
+		i += 2;
+	}
+	return (unsigned short) c + checksum + 1;
 }
 
