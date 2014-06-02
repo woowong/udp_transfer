@@ -50,13 +50,14 @@ int main(int argc, char* argv[])
 	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)-1)) > 0) {
 		// send file data
 		sendto(sock, sendBuffer, read_byte, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+//		printf("read_byte = %d\n", read_byte);
 		// receive ACK
 		recvfrom(sock, recvBuffer, sizeof(recvBuffer)-1,0, (struct sockaddr *)&serv_addr, &serv_addr_len);
 	//	printf("readbyte : %d\tSended msg : %s\n", read_byte, sendBuffer);
 		memset(sendBuffer, 0, sizeof(sendBuffer));
 	}
 	close(fd);
-
+printf("\n");
 	close(sock);
 	return 0;
 }

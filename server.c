@@ -69,14 +69,15 @@ void recv_file(int serv_sock)
 	int read_byte, total_byte=0;
 	memset (recvBuffer, 0, sizeof(recvBuffer));
 	while(1) {
-		recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-		read_byte = strlen(recvBuffer);
+		read_byte = recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	//	read_byte = strlen(recvBuffer);
 		write(fd, recvBuffer, read_byte);
 		sendto(serv_sock, ack, strlen(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	//	printf("Received Part : %s\n", recvBuffer);
 		total_byte += read_byte;
 		memset (recvBuffer, 0, sizeof(recvBuffer));
-		printf("totalbyte = %d \t filesize = %d\n", total_byte, filesize);
+		printf("totalbyte = %d\tfilesize = %d\r", total_byte, filesize);
+//		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
 		if (total_byte == filesize)
 			break;
 	} 
