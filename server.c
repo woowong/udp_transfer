@@ -37,13 +37,9 @@ int main (int argc, char *argv[])
 	bind(serv_sock, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
 
 	clnt_addr_size = sizeof(clnt_addr);
-	//	sendto(serv_sock, msg, sizeof(msg), 0, (struct sockaddr *)&clnt_addr, clnt_addr_size);
-	//	write(serv_sock, msg, sizeof(msg));
-	while(1) {
-//		recvfrom (serv_sock, msg, sizeof(msg)-1, 0, (struct sockaddr *)&clnt_addr, clnt_addr_size); 
-//		printf("received message is %s \n", msg);
-		recv_file(serv_sock);
-	}
+	
+	recv_file(serv_sock);
+
 	close(serv_sock);
 	return 0;
 }
@@ -52,21 +48,33 @@ void recv_file(int serv_sock)
 {
 	char recvBuffer[BUFFER_SIZE];
 	char filename[BUFFER_SIZE];
+	int filesize;
+	memset (filename, 0, sizeof(filename));
+	memset (recvBuffer, 0, sizeof(recvBuffer));
 
 	struct sockaddr_in clnt_addr;
 	socklen_t clnt_addr_size = sizeof(clnt_addr);
 	
 	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-	printf("Recevieving filename : %s\n", filename);
+	printf("Receiving filename : %s\n", filename);
+
+	recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	sscanf(recvBuffer, "%d", &filesize);	
+	printf("Receiving filesize : %d\n", filesize);
 
 	int fd = open(filename, O_WRONLY | O_CREAT, 0755);
-	int read_byte;
-	do {
+	int read_byte, total_byte=0;
+	memset (recvBuffer, 0, sizeof(recvBuffer));
+	while(1) {
 		recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-	read_byte = strlen(recvBuffer);
-	write(fd, recvBuffer, read_byte);
-	printf("Received Part : %s\n", recvBuffer);
-	} while(read_byte > 0);
+		read_byte = strlen(recvBuffer);
+		write(fd, recvBuffer, read_byte);
+	//	printf("Received Part : %s\n", recvBuffer);
+		total_byte += read_byte;
+		memset (recvBuffer, 0, sizeof(recvBuffer));
+		printf("totalbyte = %d \t filesize = %d\n", total_byte, filesize);
+		if (total_byte == filesize)
+			break;
+	} 
 	close(fd);
-
 }

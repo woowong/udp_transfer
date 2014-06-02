@@ -28,38 +28,30 @@ int main(int argc, char* argv[])
 	serv_addr.sin_addr.s_addr=inet_addr(argv[1]);
 	serv_addr.sin_port=htons(atoi(argv[2]));
 
-//	char msg[] = "Hello World!";
-//	sendto(sock, msg, sizeof(msg), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-	//send_file(sock, &serv_addr, argv[3]);
+	// send filename
 	char sendBuffer[BUFFER_SIZE];
+	memset(sendBuffer, 0, sizeof(sendBuffer));
 	printf("argv[3] is %s\n", argv[3]);
 	sendto(sock, argv[3], strlen(argv[3]), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
-	int fd = open(argv[3], O_RDONLY);
+	int fd = open(argv[3], O_RDONLY); // open file
+	
+	// send file size
+	int file_size = lseek(fd, 0, SEEK_END);
+	printf("the file size : %d\n", file_size);
+	sprintf(sendBuffer, "%d", file_size);
+	sendto(sock, sendBuffer, strlen(sendBuffer), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+
+	lseek(fd, 0, SEEK_SET); // set file offset start
+	memset(sendBuffer, 0, sizeof(sendBuffer));
 	int read_byte;
-	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)) ) > 0) {
+	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)-1)) > 0) {
 		sendto(sock, sendBuffer, read_byte, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-		printf("Sended msg : %s\n", sendBuffer);
+	//	printf("readbyte : %d\tSended msg : %s\n", read_byte, sendBuffer);
+		memset(sendBuffer, 0, sizeof(sendBuffer));
 	}
 	close(fd);
 
 	close(sock);
 	return 0;
 }
-/*
-void send_file(int sock, struct sockaddr_in *serv_addr, char *filename)
-{
-	char sendBuffer[BUFFER_SIZE];
-	socklen_t serv_addr_len = sizeof(*serv_addr);
-	printf("filename is %s\n", filename);
-	sendto(sock, filename, strlen(filename), 0, (struct sockaddr *)serv_addr, &serv_addr_len);
-
-	int fd = open(filename, O_RDONLY);
-	int read_byte;
-	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)) ) > 0) {
-		sendto(sock, sendBuffer, read_byte, 0, (struct sockaddr *)serv_addr, &serv_addr_len);
-		printf("Sended msg : %s\n", sendBuffer);
-	}
-	close(fd);
-}
-*/
