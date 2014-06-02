@@ -5,3 +5,4 @@ target :
 clean:
 	rm -rf client
 	rm -rf server
+	rm -rf .*.swp
