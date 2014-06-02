@@ -15,6 +15,7 @@ int main(int argc, char* argv[])
 	int sock;
 	int str_len;
 	struct sockaddr_in serv_addr;
+	socklen_t serv_addr_len = sizeof(serv_addr);
 
 	if (argc!=4) {
 		printf("Usage : %s <IP> <port> <filename>\n", argv[0]);
@@ -31,22 +32,26 @@ int main(int argc, char* argv[])
 	// send filename
 	char sendBuffer[BUFFER_SIZE];
 	memset(sendBuffer, 0, sizeof(sendBuffer));
-	printf("argv[3] is %s\n", argv[3]);
+	printf("Sending File : %s\n", argv[3]);
 	sendto(sock, argv[3], strlen(argv[3]), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
 	int fd = open(argv[3], O_RDONLY); // open file
 	
 	// send file size
 	int file_size = lseek(fd, 0, SEEK_END);
-	printf("the file size : %d\n", file_size);
+	printf("File size : %d\n", file_size);
 	sprintf(sendBuffer, "%d", file_size);
 	sendto(sock, sendBuffer, strlen(sendBuffer), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 
 	lseek(fd, 0, SEEK_SET); // set file offset start
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	int read_byte;
+	char recvBuffer[BUFFER_SIZE];
 	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)-1)) > 0) {
+		// send file data
 		sendto(sock, sendBuffer, read_byte, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+		// receive ACK
+		recvfrom(sock, recvBuffer, sizeof(recvBuffer)-1,0, (struct sockaddr *)&serv_addr, &serv_addr_len);
 	//	printf("readbyte : %d\tSended msg : %s\n", read_byte, sendBuffer);
 		memset(sendBuffer, 0, sizeof(sendBuffer));
 	}
@@ -55,3 +60,4 @@ int main(int argc, char* argv[])
 	close(sock);
 	return 0;
 }
+

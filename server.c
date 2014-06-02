@@ -48,6 +48,7 @@ void recv_file(int serv_sock)
 {
 	char recvBuffer[BUFFER_SIZE];
 	char filename[BUFFER_SIZE];
+	char ack[] = "ACK\0";
 	int filesize;
 	memset (filename, 0, sizeof(filename));
 	memset (recvBuffer, 0, sizeof(recvBuffer));
@@ -55,9 +56,11 @@ void recv_file(int serv_sock)
 	struct sockaddr_in clnt_addr;
 	socklen_t clnt_addr_size = sizeof(clnt_addr);
 	
+	// filename get
 	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
 	printf("Receiving filename : %s\n", filename);
 
+	// filesize get
 	recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
 	sscanf(recvBuffer, "%d", &filesize);	
 	printf("Receiving filesize : %d\n", filesize);
@@ -69,6 +72,7 @@ void recv_file(int serv_sock)
 		recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
 		read_byte = strlen(recvBuffer);
 		write(fd, recvBuffer, read_byte);
+		sendto(serv_sock, ack, strlen(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	//	printf("Received Part : %s\n", recvBuffer);
 		total_byte += read_byte;
 		memset (recvBuffer, 0, sizeof(recvBuffer));
@@ -78,3 +82,4 @@ void recv_file(int serv_sock)
 	} 
 	close(fd);
 }
+
