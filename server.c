@@ -6,8 +6,13 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-#define BUFFER_SIZE 1024
-// struct
+#define BUFFER_SIZE 1025
+typedef struct datagram {
+	int seq_num;
+	uint16_t checksum;
+	char dataBuffer[BUFFER_SIZE];
+	int read_byte;
+} DATA;
 
 void recv_file(int serv_sock);
 
@@ -16,11 +21,9 @@ int main (int argc, char *argv[])
 	int serv_sock;
 	int clnt_sock;
 
-
 	struct sockaddr_in serv_addr;
 	struct sockaddr_in clnt_addr;
 	socklen_t clnt_addr_size;
-
 
 	if (argc!=2)
 	{
@@ -47,6 +50,7 @@ int main (int argc, char *argv[])
 
 void recv_file(int serv_sock)
 {
+	DATA packet;
 	char recvBuffer[BUFFER_SIZE];
 	char filename[BUFFER_SIZE];
 	char ack[] = "ACK\0";
@@ -56,6 +60,9 @@ void recv_file(int serv_sock)
 
 	struct sockaddr_in clnt_addr;
 	socklen_t clnt_addr_size = sizeof(clnt_addr);
+	
+	//initial packet
+	memset(&packet, 0, sizeof(packet));
 	
 	// filename get
 	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
@@ -70,17 +77,18 @@ void recv_file(int serv_sock)
 	int read_byte, total_byte=0;
 	memset (recvBuffer, 0, sizeof(recvBuffer));
 	while(1) {
-		read_byte = recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-	//	read_byte = strlen(recvBuffer);
-		write(fd, recvBuffer, read_byte);
+		recvfrom(serv_sock, &packet, sizeof(packet), 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+		read_byte = packet.read_byte;
+		write(fd, packet.dataBuffer, read_byte);
+		
 		sendto(serv_sock, ack, strlen(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	//	printf("Received Part : %s\n", recvBuffer);
 		total_byte += read_byte;
 		memset (recvBuffer, 0, sizeof(recvBuffer));
-		printf("totalbyte = %d\tfilesize = %d\r", total_byte, filesize);
-//		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
+		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
 		if (total_byte == filesize)
 			break;
+		memset(&packet, 0, sizeof(packet));
 	} 
 	close(fd);
 }

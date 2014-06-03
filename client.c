@@ -6,21 +6,34 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 1025
+typedef struct datagram {
+	int seq_num;
+	uint16_t checksum;
+	char dataBuffer[BUFFER_SIZE];
+	int read_byte;
+} DATA;
 
 void send_file(int sock, struct sockaddr_in *serv_addr, char *filename);
+uint16_t gen_checksum(char *buffer, int length);
 
 int main(int argc, char* argv[])
 {
 	int sock;
 	int str_len;
 	struct sockaddr_in serv_addr;
+	DATA packet;
+	char sendBuffer[BUFFER_SIZE];
+	char recvBuffer[BUFFER_SIZE];
 	socklen_t serv_addr_len = sizeof(serv_addr);
 
 	if (argc!=4) {
 		printf("Usage : %s <IP> <port> <filename>\n", argv[0]);
 		exit(1);
 	}
+	
+	memset(&packet, 0, sizeof(packet));
+	packet.seq_num = 0;
 
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
 
@@ -30,7 +43,6 @@ int main(int argc, char* argv[])
 	serv_addr.sin_port=htons(atoi(argv[2]));
 
 	// send filename
-	char sendBuffer[BUFFER_SIZE];
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	printf("Sending File : %s\n", argv[3]);
 	sendto(sock, argv[3], strlen(argv[3]), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
@@ -46,19 +58,39 @@ int main(int argc, char* argv[])
 	lseek(fd, 0, SEEK_SET); // set file offset start
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	int read_byte;
-	char recvBuffer[BUFFER_SIZE];
-	while( (read_byte = read(fd, sendBuffer, sizeof(sendBuffer)-1)) > 0) {
+	while( (read_byte = read(fd, packet.dataBuffer, sizeof(packet.dataBuffer)-1)) > 0) {
+	//	strncpy(packet.dataBuffer, sendBuffer, read_byte);
+		packet.read_byte = read_byte;
+		packet.checksum = gen_checksum(packet.dataBuffer, read_byte);
 		// send file data
-		sendto(sock, sendBuffer, read_byte, 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-//		printf("read_byte = %d\n", read_byte);
+		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 		// receive ACK
 		recvfrom(sock, recvBuffer, sizeof(recvBuffer)-1,0, (struct sockaddr *)&serv_addr, &serv_addr_len);
 	//	printf("readbyte : %d\tSended msg : %s\n", read_byte, sendBuffer);
 		memset(sendBuffer, 0, sizeof(sendBuffer));
+		memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
 	}
 	close(fd);
-printf("\n");
+	printf("\n");
 	close(sock);
 	return 0;
+}
+
+uint16_t gen_checksum(char *buffer, int length)
+{
+	uint16_t *buf = (void *)buffer;
+	uint32_t sum = 0;
+	while ( length > 1 )
+	{
+		sum += *buf++;
+		if (sum & 0x80000000)
+			sum = (sum & 0xFFFF) +(sum >> 16);
+		length -= 2;
+	}
+	if ( length == 1 )
+		sum += *((uint8_t *)buf);
+	while ( sum >> 16 )
+		sum = (sum & 0xFFFF) +(sum >> 16);
+	return (uint16_t)(~sum);
 }
 
