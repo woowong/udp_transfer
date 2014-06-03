@@ -7,6 +7,7 @@
 #include <fcntl.h>
 
 #define BUFFER_SIZE 1024
+// struct
 
 void recv_file(int serv_sock);
 
