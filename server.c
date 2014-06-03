@@ -69,10 +69,12 @@ void recv_file(int serv_sock)
 	
 	// filename get
 	recvfrom(serv_sock, filename, sizeof(filename)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	printf("Receiving filename : %s\n", filename);
 
 	// filesize get
 	recvfrom(serv_sock, recvBuffer, sizeof(recvBuffer)-1, 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+	sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 	sscanf(recvBuffer, "%d", &filesize);	
 	printf("Receiving filesize : %d\n", filesize);
 

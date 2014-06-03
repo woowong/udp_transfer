@@ -23,6 +23,7 @@ int main(int argc, char* argv[])
 	int str_len;
 	struct sockaddr_in serv_addr;
 	int ack = 1;
+	int temp;
 	DATA packet;
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
@@ -51,7 +52,8 @@ int main(int argc, char* argv[])
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	printf("Sending File : %s\n", argv[3]);
 	sendto(sock, argv[3], strlen(argv[3]), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-
+	recvfrom(sock, &temp, sizeof(temp), 0, (struct sockaddr *)&serv_addr, &serv_addr_len);
+	
 	int fd = open(argv[3], O_RDONLY); // open file
 	
 	// send file size
@@ -59,6 +61,7 @@ int main(int argc, char* argv[])
 	printf("File size : %d\n", file_size);
 	sprintf(sendBuffer, "%d", file_size);
 	sendto(sock, sendBuffer, strlen(sendBuffer), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+	recvfrom(sock, &temp, sizeof(temp), 0, (struct sockaddr *)&serv_addr, &serv_addr_len);
 
 	lseek(fd, 0, SEEK_SET); // set file offset start
 	memset(sendBuffer, 0, sizeof(sendBuffer));
@@ -76,11 +79,11 @@ int main(int argc, char* argv[])
 		// send file data
 		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 		// receive ACK
-		ack_err = (ack!=packet.seq_num)	? 1 : 0;
 		if ( recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len) < 0 ) {
 			printf("ERROR : Time out.\n");
 			ack_err = 1;
 		}
+		ack_err = (ack!=packet.seq_num)	? 1 : 0;
 		if(!ack_err) 
 			memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
 	}
