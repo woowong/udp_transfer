@@ -110,10 +110,10 @@ void recv_file(int serv_sock)
 			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 			printf("ERROR : Duplicate sequence number.\n");
 		}
-		else if(timeout_err) { // timeout error occured
+/*		else if(timeout_err) { // timeout error occured
 			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
 			printf("ERROR : Time out receiving.\n");
-		}
+		}*/
 		memset(&packet, 0, sizeof(packet));
 		memset(recvBuffer, 0, sizeof(recvBuffer));
 	}

@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #define BUFFER_SIZE 1025
 typedef struct datagram {
@@ -36,6 +37,10 @@ int main(int argc, char* argv[])
 	//packet.seq_num = 0;
 
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
+	struct timeval tv;
+	tv.tv_sec = 5;
+	tv.tv_usec = 0;
+	setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family=AF_INET;
@@ -71,8 +76,11 @@ int main(int argc, char* argv[])
 		// send file data
 		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 		// receive ACK
-		recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len);
 		ack_err = (ack!=packet.seq_num)	? 1 : 0;
+		if ( recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len) < 0 ) {
+			printf("ERROR : Time out.\n");
+			ack_err = 1;
+		}
 		if(!ack_err) 
 			memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
 	}
