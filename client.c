@@ -24,6 +24,7 @@ int main(int argc, char* argv[])
 	struct sockaddr_in serv_addr;
 	int ack = 1;
 	int temp;
+	int retrans=0, timeout=0;
 	DATA packet;
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
@@ -67,7 +68,12 @@ int main(int argc, char* argv[])
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	int read_byte;
 	int ack_err = 0;
+	// Measuring Transmission Time
+	struct timeval t1, t2;
+	double t_time;
+	gettimeofday(&t1, NULL); // Start Time
 	printf("File is being sended...\n");
+
 	while(1) {
 		if(!ack_err) {	
 			read_byte = read(fd, packet.dataBuffer, sizeof(packet.dataBuffer)-1);
@@ -76,11 +82,16 @@ int main(int argc, char* argv[])
 			packet.read_byte = read_byte;
 			packet.checksum = gen_checksum(packet.dataBuffer, read_byte);
 		}
+		else {
+			printf("ERROR : Retransmission occured. (by corrupted checksum or duplicated transfer data)\n");
+			retrans++;
+		}
 		// send file data
 		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 		// receive ACK
 		if ( recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len) < 0 ) {
 			printf("ERROR : Time out.\n");
+			timeout++;
 			ack_err = 1;
 		}
 		ack_err = (ack!=packet.seq_num)	? 1 : 0;
@@ -88,7 +99,14 @@ int main(int argc, char* argv[])
 			memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
 	}
 	close(fd);
+	gettimeofday(&t2, NULL); // End Time
 	printf("File Sending is over.\n");
+	t_time = (t2.tv_sec - t1.tv_sec) * 1000.0; // sec to ms
+	t_time += (t2.tv_usec - t1.tv_usec) / 1000.0; // microsecond to ms
+	printf("Data transfer time : %.3lf ms.\n", t_time);
+	double transfer_rate = ((double)(file_size/1024)) / (t_time/1000);
+	printf("Data transfer rate : %.2lfKB/s.\n", transfer_rate);
+	printf("Timeout count : %d\tRetransmission count : %d\n", timeout, retrans);
 	close(sock);
 	return 0;
 }
