@@ -15,6 +15,7 @@ typedef struct datagram {
 } DATA;
 
 void recv_file(int serv_sock);
+uint16_t check_checksum(char *buffer, int length, uint16_t checksum);
 
 int main (int argc, char *argv[])
 {
@@ -53,7 +54,9 @@ void recv_file(int serv_sock)
 	DATA packet;
 	char recvBuffer[BUFFER_SIZE];
 	char filename[BUFFER_SIZE];
-	char ack[] = "ACK\0";
+//	char ack[] = "ACK\0";
+	int ack;
+
 	int filesize;
 	memset (filename, 0, sizeof(filename));
 	memset (recvBuffer, 0, sizeof(recvBuffer));
@@ -75,21 +78,66 @@ void recv_file(int serv_sock)
 
 	int fd = open(filename, O_WRONLY | O_CREAT, 0755);
 	int read_byte, total_byte=0;
+	int chk_err = 0, dup_err = 0, timeout_err = 0;
+	int prev_seq_num = 1;
 	memset (recvBuffer, 0, sizeof(recvBuffer));
+	printf("File is being received...\n");
 	while(1) {
+		// get packet
 		recvfrom(serv_sock, &packet, sizeof(packet), 0, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
 		read_byte = packet.read_byte;
-		write(fd, packet.dataBuffer, read_byte);
-		
-		sendto(serv_sock, ack, strlen(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
-	//	printf("Received Part : %s\n", recvBuffer);
-		total_byte += read_byte;
-		memset (recvBuffer, 0, sizeof(recvBuffer));
-		printf("read_byte = %d\ttotalbyte = %d \t filesize = %d\n", read_byte, total_byte, filesize);
-		if (total_byte == filesize)
-			break;
+
+		chk_err = (check_checksum(packet.dataBuffer, read_byte, packet.checksum) != 0) ? 1 : 0; // checksum err
+		dup_err = packet.seq_num == prev_seq_num ? 1 : 0; // duplicate
+	// timeout_err
+
+		if(!chk_err & !dup_err & !timeout_err) { // get success
+			ack = packet.seq_num;
+			write(fd, packet.dataBuffer, read_byte); // wrtie to file
+			total_byte += read_byte;
+			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
+			prev_seq_num = packet.seq_num;
+			if (total_byte == filesize)
+				break;
+		}
+		else if(chk_err) { // checksum error occured
+			ack = !ack;
+			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
+			printf("ERROR : Checksum is corrupted.\n");
+		}
+		else if(dup_err) { // duplicate error occured
+			ack = !ack;
+			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
+			printf("ERROR : Duplicate sequence number.\n");
+		}
+		else if(timeout_err) { // timeout error occured
+			sendto(serv_sock, &ack, sizeof(ack), 0, (struct sockaddr *)&clnt_addr, sizeof(clnt_addr));
+			printf("ERROR : Time out receiving.\n");
+		}
 		memset(&packet, 0, sizeof(packet));
-	} 
+		memset(recvBuffer, 0, sizeof(recvBuffer));
+	}
 	close(fd);
+	printf("File Receiving is over.\n");
+	close(serv_sock);
 }
+
+uint16_t check_checksum(char *buffer, int length, uint16_t checksum)
+{
+	uint16_t *buf = (void *)buffer;
+	uint32_t sum = 0;
+	while ( length > 1 )
+	{
+		sum += *buf++;
+		if (sum & 0x80000000)
+			sum = (sum & 0xFFFF) +(sum >> 16);
+		length -= 2;
+	}
+	if ( length == 1 )
+		sum += *((uint8_t *)buf);
+	while ( sum >> 16 )
+		sum = (sum & 0xFFFF) +(sum >> 16);
+	return (uint16_t)sum + checksum + 1;
+}
+
 

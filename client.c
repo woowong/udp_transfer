@@ -14,7 +14,6 @@ typedef struct datagram {
 	int read_byte;
 } DATA;
 
-void send_file(int sock, struct sockaddr_in *serv_addr, char *filename);
 uint16_t gen_checksum(char *buffer, int length);
 
 int main(int argc, char* argv[])
@@ -22,6 +21,7 @@ int main(int argc, char* argv[])
 	int sock;
 	int str_len;
 	struct sockaddr_in serv_addr;
+	int ack = 1;
 	DATA packet;
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
 	}
 	
 	memset(&packet, 0, sizeof(packet));
-	packet.seq_num = 0;
+	//packet.seq_num = 0;
 
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
 
@@ -58,20 +58,26 @@ int main(int argc, char* argv[])
 	lseek(fd, 0, SEEK_SET); // set file offset start
 	memset(sendBuffer, 0, sizeof(sendBuffer));
 	int read_byte;
-	while( (read_byte = read(fd, packet.dataBuffer, sizeof(packet.dataBuffer)-1)) > 0) {
-	//	strncpy(packet.dataBuffer, sendBuffer, read_byte);
-		packet.read_byte = read_byte;
-		packet.checksum = gen_checksum(packet.dataBuffer, read_byte);
+	int ack_err = 0;
+	printf("File is being sended...\n");
+	while(1) {
+		if(!ack_err) {	
+			read_byte = read(fd, packet.dataBuffer, sizeof(packet.dataBuffer)-1);
+			if(read_byte <= 0) break;
+			packet.seq_num = !ack;
+			packet.read_byte = read_byte;
+			packet.checksum = gen_checksum(packet.dataBuffer, read_byte);
+		}
 		// send file data
 		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 		// receive ACK
-		recvfrom(sock, recvBuffer, sizeof(recvBuffer)-1,0, (struct sockaddr *)&serv_addr, &serv_addr_len);
-	//	printf("readbyte : %d\tSended msg : %s\n", read_byte, sendBuffer);
-		memset(sendBuffer, 0, sizeof(sendBuffer));
-		memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
+		recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len);
+		ack_err = (ack!=packet.seq_num)	? 1 : 0;
+		if(!ack_err) 
+			memset(packet.dataBuffer, 0, sizeof(packet.dataBuffer));
 	}
 	close(fd);
-	printf("\n");
+	printf("File Sending is over.\n");
 	close(sock);
 	return 0;
 }
