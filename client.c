@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 
-#define BUFFER_SIZE 1025
+#define BUFFER_SIZE 3000
 typedef struct datagram {
 	int seq_num;
 	uint16_t checksum;
@@ -66,13 +66,13 @@ int main(int argc, char* argv[])
 
 	lseek(fd, 0, SEEK_SET); // set file offset start
 	memset(sendBuffer, 0, sizeof(sendBuffer));
-	int read_byte;
+	int read_byte, total_byte=0;
 	int ack_err = 0;
 	// Measuring Transmission Time
 	struct timeval t1, t2;
 	double t_time;
 	gettimeofday(&t1, NULL); // Start Time
-	printf("File is being sended...\n");
+	printf("File is being sent...\n");
 
 	while(1) {
 		if(!ack_err) {	
@@ -81,6 +81,7 @@ int main(int argc, char* argv[])
 			packet.seq_num = !ack;
 			packet.read_byte = read_byte;
 			packet.checksum = gen_checksum(packet.dataBuffer, read_byte);
+			total_byte += read_byte;
 		}
 		else {
 			printf("ERROR : Retransmission occured. (by corrupted checksum or duplicated transfer data)\n");
@@ -88,9 +89,10 @@ int main(int argc, char* argv[])
 		}
 		// send file data
 		sendto(sock, &packet, sizeof(packet), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+		printf("%d bytes / %d bytes\r", total_byte, file_size);
 		// receive ACK
 		if ( recvfrom(sock, &ack, sizeof(ack), 0, (struct sockaddr *)&serv_addr, &serv_addr_len) < 0 ) {
-			printf("ERROR : Time out.\n");
+			printf("\nERROR : Time out.\n");
 			timeout++;
 			ack_err = 1;
 		}
@@ -100,7 +102,7 @@ int main(int argc, char* argv[])
 	}
 	close(fd);
 	gettimeofday(&t2, NULL); // End Time
-	printf("File Sending is over.\n");
+	printf("\nFile Sending is over.\n");
 	t_time = (t2.tv_sec - t1.tv_sec) * 1000.0; // sec to ms
 	t_time += (t2.tv_usec - t1.tv_usec) / 1000.0; // microsecond to ms
 	printf("Data transfer time : %.3lf ms.\n", t_time);

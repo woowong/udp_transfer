@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-#define BUFFER_SIZE 1025
+#define BUFFER_SIZE 3000
 typedef struct datagram {
 	int seq_num;
 	uint16_t checksum;
